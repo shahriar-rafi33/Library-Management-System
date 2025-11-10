@@ -1,29 +1,22 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
+import { validate } from 'class-validator';
 import { CreateAdminDto } from './dto/create-admin.dto';
 
 @Injectable()
 export class AdminService {
   private admins = [];
 
-  createAdmin(data: CreateAdminDto) {
+  async createAdmin(data: CreateAdminDto) {
     
-    if (!data.email || !data.email.includes('@aiub.edu')) {
-      return { message: 'Invalid email! It must include @aiub.edu domain.' };
-    }
+    const dto = Object.assign(new CreateAdminDto(), data);
+    const errors = await validate(dto);
 
-   
-    if (data.password.length < 6 || !/[A-Z]/.test(data.password)) {
-      return { message: 'Password must be at least 6 characters and contain one uppercase letter.' };
-    }
-
-
-    if (data.gender !== 'male' && data.gender !== 'female') {
-      return { message: 'Gender must be male or female.' };
-    }
-
- 
-    if (!/^[0-9]+$/.test(data.phone)) {
-      return { message: 'Phone number must contain only numbers.' };
+    if (errors.length > 0) {
+      const messages = errors
+        .map(err => Object.values(err.constraints ?? {}))
+        .flat()
+        .join(', ');
+      throw new BadRequestException(messages);
     }
 
     const newAdmin = { id: Date.now(), ...data };
