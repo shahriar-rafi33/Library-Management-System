@@ -4,4 +4,3 @@ export class CreateAdminDto {
   password: string;
   role?: string;
 }
-//Hello World
