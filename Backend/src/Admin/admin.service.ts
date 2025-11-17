@@ -1,66 +1,135 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { validate } from 'class-validator';
+import { Admin, AdminStatus } from './admin.entity';
 import { CreateAdminDto } from './dto/create-admin.dto';
 
 @Injectable()
 export class AdminService {
-  private admins = [];
+  constructor(
+    @InjectRepository(Admin)
+    private readonly adminRepository: Repository<Admin>,
+  ) {}
 
-  async createAdmin(data: CreateAdminDto) {
-    
+  async createAdmin(data: CreateAdminDto): Promise<Admin> {
     const dto = Object.assign(new CreateAdminDto(), data);
     const errors = await validate(dto);
 
     if (errors.length > 0) {
       const messages = errors
-        .map(err => Object.values(err.constraints ?? {}))
+        .map((err) => Object.values(err.constraints ?? {}))
         .flat()
         .join(', ');
       throw new BadRequestException(messages);
     }
 
-    const newAdmin = { id: Date.now(), ...data };
-    this.admins.push(newAdmin);
-    return { message: 'Admin created successfully', admin: newAdmin };
+    const existingAdmin = await this.adminRepository.findOne({
+      where: { email: data.email },
+    });
+    if (existingAdmin) {
+      throw new BadRequestException('Email already exists!');
+    }
+
+    const newAdmin = this.adminRepository.create(data as Admin);
+    return await this.adminRepository.save(newAdmin);
   }
 
-  getAllAdmins() {
-    return { message: 'All admins fetched', admins: this.admins };
+  async getAllAdmins(): Promise<Admin[]> {
+    return await this.adminRepository.find({
+      order: { createdAt: 'DESC' },
+    });
   }
 
-  getAdminById(id: number) {
-    const admin = this.admins.find(a => a.id === id);
-    if (!admin) return { message: 'Admin not found' };
-    return { message: 'Admin found', admin };
+  async getAdminById(id: number): Promise<Admin> {
+    const admin = await this.adminRepository.findOne({ where: { id } });
+    if (!admin) {
+      throw new NotFoundException(`Admin with ID ${id} not found`);
+    }
+    return admin;
   }
 
-  updateAdmin(id: number, data: CreateAdminDto) {
-    const admin = this.admins.find(a => a.id === id);
-    if (!admin) return { message: 'Admin not found' };
+  async updateAdmin(id: number, data: CreateAdminDto): Promise<Admin> {
+    const admin = await this.getAdminById(id);
+
+    if (data.email && data.email !== admin.email) {
+      const emailExists = await this.adminRepository.findOne({
+        where: { email: data.email },
+      });
+      if (emailExists) {
+        throw new BadRequestException('Email already exists!');
+      }
+    }
+
     Object.assign(admin, data);
-    return { message: 'Admin updated successfully', admin };
+    return await this.adminRepository.save(admin);
   }
 
-  partialUpdateAdmin(id: number, data: Partial<CreateAdminDto>) {
-    return this.updateAdmin(id, data as CreateAdminDto);
+  async partialUpdateAdmin(
+    id: number,
+    data: Partial<CreateAdminDto>,
+  ): Promise<Admin> {
+    const admin = await this.getAdminById(id);
+
+    if (data.email && data.email !== admin.email) {
+      const emailExists = await this.adminRepository.findOne({
+        where: { email: data.email },
+      });
+      if (emailExists) {
+        throw new BadRequestException('Email already exists!');
+      }
+    }
+
+    Object.assign(admin, data);
+    return await this.adminRepository.save(admin);
   }
 
-  deleteAdmin(id: number) {
-    this.admins = this.admins.filter(a => a.id !== id);
-    return { message: 'Admin deleted successfully' };
+  async deleteAdmin(id: number): Promise<{ message: string }> {
+    const admin = await this.getAdminById(id);
+    await this.adminRepository.remove(admin);
+    return { message: `Admin with ID ${id} deleted successfully` };
   }
 
-  assignRole(id: number, role: string) {
-    const admin = this.admins.find(a => a.id === id);
-    if (!admin) return { message: 'Admin not found' };
+  async assignRole(id: number, role: string): Promise<Admin> {
+    const admin = await this.getAdminById(id);
     admin.role = role;
-    return { message: 'Role assigned successfully', admin };
+    return await this.adminRepository.save(admin);
   }
 
-  searchAdmins(name: string) {
-    const results = this.admins.filter(a =>
-      a.name.toLowerCase().includes(name.toLowerCase()),
-    );
-    return { message: 'Search results', results };
+  async searchAdmins(name: string): Promise<Admin[]> {
+    return await this.adminRepository
+      .createQueryBuilder('admin')
+      .where('LOWER(admin.fullName) LIKE LOWER(:name)', {
+        name: `%${name}%`,
+      })
+      .orWhere('LOWER(admin.email) LIKE LOWER(:name)', { name: `%${name}%` })
+      .orderBy('admin.createdAt', 'DESC')
+      .getMany();
+  }
+  
+  async getInactiveAdmins(): Promise<Admin[]> {
+    return await this.adminRepository.find({
+      where: { status: AdminStatus.INACTIVE },
+      order: { createdAt: 'ASC' },
+    });
+  }
+
+  async changeStatus(id: number, status: AdminStatus): Promise<Admin> {
+    const admin = await this.getAdminById(id);
+    admin.status = status;
+    return await this.adminRepository.save(admin);
+  }
+
+  async getAdminsOlderThan40(): Promise<Admin[]> {
+    return await this.adminRepository
+      .createQueryBuilder('admin')
+      .where('admin.age > :age', { age: 40 })
+      .orderBy('admin.age', 'DESC')
+      .addOrderBy('admin.createdAt', 'DESC')
+      .getMany();
   }
 }

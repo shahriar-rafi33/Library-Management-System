@@ -1,7 +1,19 @@
-import { IsEmail, Matches, MinLength, IsIn, IsNumberString } from 'class-validator';
+import {
+  IsEmail,
+  Matches,
+  MinLength,
+  IsIn,
+  IsNumberString,
+  IsString,
+  IsInt,
+  Min,
+  Max,
+  IsOptional,
+} from 'class-validator';
 
 export class CreateAdminDto {
-  name: string;
+  @IsString({ message: 'Full name must be a string!' })
+  fullName: string;
 
   @IsEmail({}, { message: 'Invalid email format!' })
   @Matches(/@aiub\.edu$/, { message: 'Email must contain aiub.edu domain!' })
@@ -16,8 +28,23 @@ export class CreateAdminDto {
   @IsIn(['male', 'female'], { message: 'Gender must be male or female!' })
   gender: string;
 
-  @IsNumberString({}, { message: 'invalid phone!' })
+  @IsNumberString({}, { message: 'Phone must be a valid number string!' })
   phone: string;
 
+  @IsInt({ message: 'Age must be an integer!' })
+  @Min(18, { message: 'Admin must be at least 18 years old!' })
+  @Max(80, { message: 'Age must not exceed 80!' })
+  age: number;
+
+  @IsOptional()
+  @IsIn(['admin', 'moderator', 'editor'], {
+    message: 'Role must be admin, moderator, or editor!',
+  })
   role?: string;
+
+  @IsOptional()
+  @IsIn(['active', 'inactive'], {
+    message: 'Status must be active or inactive!',
+  })
+  status?: string;
 }
