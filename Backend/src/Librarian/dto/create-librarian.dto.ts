@@ -5,13 +5,13 @@ import {
   IsIn,
   IsNumberString,
 } from 'class-validator';
-
 export class CreateLibrarianDto {
   @MinLength(2, { message: 'First name must be at least 2 characters long' })
   firstName: string;
 
   @MinLength(2, { message: 'Last name must be at least 2 characters long' })
   lastName: string;
+  fullName: string;
 
   @IsEmail({}, { message: 'Invalid email format!' })
   @Matches(/@aiub\.edu$/, { message: 'Email must contain aiub.edu domain!' })
@@ -27,9 +27,7 @@ export class CreateLibrarianDto {
   gender: string;
 
   @IsNumberString({}, { message: 'Phone number must contain only numbers!' })
-  phone: string;
-
-  role?: string;
+  phone: number;
 
   @IsIn(['Librarian', 'Admin', 'Student'], {
     message: 'Role must be defined...',

@@ -1,14 +1,21 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { CreateLibrarianDto } from './dto/create-librarian.dto';
 import { validate } from 'class-validator';
+import { LibrarianEntity } from './librarian.entity';
+import { Repository } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
 
 @Injectable()
 export class LibrarianService {
-  private librarians = [];
-  async createLibrarian(data: CreateLibrarianDto) {
+  constructor(
+    @InjectRepository(LibrarianEntity)
+    private readonly librarianRepository: Repository<LibrarianEntity>,
+  ) {}
+
+  async createLibrarian(data: CreateLibrarianDto): Promise<LibrarianEntity> {
+    // Step 1: Validate DTO
     const dto = Object.assign(new CreateLibrarianDto(), data);
     const errors = await validate(dto);
-
     if (errors.length > 0) {
       const messages = errors
         .map((err) => Object.values(err.constraints ?? {}))
@@ -16,57 +23,73 @@ export class LibrarianService {
         .join(', ');
       throw new BadRequestException(messages);
     }
-    const newLibrarian = { id: Date.now(), ...data };
-    this.librarians.push(newLibrarian);
-    return {message: 'Librarian created successfully', librarian: newLibrarian};
+
+    // Step 2: Create entity instance (NOT plain object)
+    const newLibrarian = this.librarianRepository.create(data);
+    
+    // Step 3: Save to database
+    // ✅ @BeforeInsert hook will trigger here
+    const saved = await this.librarianRepository.save(newLibrarian);
+    
+    console.log('New Librarian Created:', saved);
+    return saved;
   }
-  getAllLibrarians() {
-    return this.librarians;
+
+  async getAllLibrarians(): Promise<LibrarianEntity[]> {
+    // Query from database, not in-memory array
+    return await this.librarianRepository.find();
   }
-  getLibrarianById(id: number) {
-    const librarian = this.librarians.find((lib) => lib.id === id);
+
+  async getLibrarianById(id: number): Promise<LibrarianEntity> {
+    const librarian = await this.librarianRepository.findOne({ where: { id } });
     if (!librarian) {
       throw new BadRequestException('Librarian not found');
     }
     return librarian;
   }
-  deleteLibrarian(id: number) {
-    const index = this.librarians.findIndex((lib) => lib.id === id);
-    if (index === -1) {
-      throw new BadRequestException('Librarian not found');
-    }
-    const deletedLibrarian = this.librarians.splice(index, 1);
-    return deletedLibrarian[0];
+
+  async deleteLibrarian(id: number): Promise<{ message: string }> {
+    const librarian = await this.getLibrarianById(id);
+    await this.librarianRepository.remove(librarian);
+    return { message: `Librarian with ID ${id} deleted successfully` };
   }
-  updateLibrarian(id: number, data: CreateLibrarianDto) {
-    const librarian = this.librarians.find((lib) => lib.id === id);
-    if (!librarian) {
-      throw new BadRequestException('Librarian not found');
-    }
+
+  async updateLibrarian(
+    id: number,
+    data: CreateLibrarianDto,
+  ): Promise<LibrarianEntity> {
+    const librarian = await this.getLibrarianById(id);
+    
+    // Update entity properties
     Object.assign(librarian, data);
-    return librarian;
+    
+    // Save changes to database
+    return await this.librarianRepository.save(librarian);
   }
-  partialUpdateLibrarian(id: number, data: Partial<CreateLibrarianDto>) {
-    const librarian = this.librarians.find((lib) => lib.id === id);
-    if (!librarian) {
-      throw new BadRequestException('Librarian not found');
-    }
+
+  async partialUpdateLibrarian(
+    id: number,
+    data: Partial<CreateLibrarianDto>,
+  ): Promise<LibrarianEntity> {
+    const librarian = await this.getLibrarianById(id);
+    
+    // Update only provided fields
     Object.assign(librarian, data);
-    return librarian;
+    
+    return await this.librarianRepository.save(librarian);
   }
-  assignRole(id: number, role: string) {
-    const librarian = this.librarians.find((lib) => lib.id === id);
-    if (!librarian) {
-      throw new BadRequestException('Librarian not found');
-    }
-    librarian.role = role;
-    return librarian;
+
+  async assignRole(id: number, role: string): Promise<LibrarianEntity> {
+    const librarian = await this.getLibrarianById(id);
+    librarian.designation = role; // Assuming 'designation' is the role field
+    return await this.librarianRepository.save(librarian);
   }
-  searchLibrarians(name: string) {
-    return this.librarians.filter(
-      (lib) =>
-        lib.firstName.toLowerCase().includes(name.toLowerCase()) ||
-        lib.lastName.toLowerCase().includes(name.toLowerCase()),
-    );
+
+  async searchLibrarians(name: string): Promise<LibrarianEntity[]> {
+    return await this.librarianRepository
+      .createQueryBuilder('librarian')
+      .where('LOWER(librarian.firstName) LIKE LOWER(:name)', { name: `%${name}%` })
+      .orWhere('LOWER(librarian.lastName) LIKE LOWER(:name)', { name: `%${name}%` })
+      .getMany();
   }
 }
