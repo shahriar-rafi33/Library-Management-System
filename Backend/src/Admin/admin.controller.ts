@@ -23,25 +23,23 @@ import {
   CreateAdminProfileDto,
 } from './dto/create-admin.dto';
 import { AdminStatus } from './admin.entity';
-import { JwtAuthGuard } from './admin.guard';
+import { JwtAuthGuard } from '../Auth/jwt-auth.guard';
 
 @Controller('admin')
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
-
   @Post('register')
   @UsePipes(new ValidationPipe({ whitelist: true }))
-  register(@Body() createDto: CreateAdminDto) {
-    return this.adminService.register(createDto);
+  register(@Body() dto: CreateAdminDto) {
+    return this.adminService.register(dto);
   }
 
   @Post('login')
   @UsePipes(new ValidationPipe({ whitelist: true }))
-  login(@Body() loginDto: LoginAdminDto) {
-    return this.adminService.login(loginDto);
+  login(@Body() dto: LoginAdminDto) {
+    return this.adminService.login(dto);
   }
-
 
   @UseGuards(JwtAuthGuard)
   @Get()
@@ -56,12 +54,6 @@ export class AdminController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Get('older-than/:age')
-  getOlderThan(@Param('age', ParseIntPipe) age: number) {
-    return this.adminService.getAdminsOlderThan(age);
-  }
-
-  @UseGuards(JwtAuthGuard)
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.adminService.findOneById(id);
@@ -70,11 +62,8 @@ export class AdminController {
   @UseGuards(JwtAuthGuard)
   @Put(':id')
   @UsePipes(new ValidationPipe({ whitelist: true }))
-  update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() updateDto: UpdateAdminDto,
-  ) {
-    return this.adminService.update(id, updateDto);
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateAdminDto) {
+    return this.adminService.update(id, dto);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -84,9 +73,7 @@ export class AdminController {
     @Body('status') status: AdminStatus,
   ) {
     if (!Object.values(AdminStatus).includes(status)) {
-      throw new BadRequestException(
-        'Status must be either active or inactive',
-      );
+      throw new BadRequestException('Status must be either active or inactive');
     }
     return this.adminService.changeStatus(id, status);
   }
@@ -97,15 +84,11 @@ export class AdminController {
     return this.adminService.remove(id);
   }
 
-  // One-to-One: Admin <-> AdminProfile
-
+  // profile (simple)
   @UseGuards(JwtAuthGuard)
   @Put(':id/profile')
   @UsePipes(new ValidationPipe({ whitelist: true }))
-  upsertProfile(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: CreateAdminProfileDto,
-  ) {
+  upsertProfile(@Param('id', ParseIntPipe) id: number, @Body() dto: CreateAdminProfileDto) {
     return this.adminService.upsertProfile(id, dto);
   }
 
@@ -121,8 +104,7 @@ export class AdminController {
     return this.adminService.deleteProfile(id);
   }
 
-  // One-to-Many: Admin <-> LibrarianEntity
-
+  // admin -> librarians
   @UseGuards(JwtAuthGuard)
   @Get(':id/librarians')
   getLibrarians(@Param('id', ParseIntPipe) id: number) {

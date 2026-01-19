@@ -7,31 +7,32 @@ import {
   MinLength,
   IsNumberString,
   IsBoolean,
+  IsOptional,
 } from 'class-validator';
 import { PartialType } from '@nestjs/mapped-types';
 
 export class CreateLibrarianDto {
   @IsString()
-  @MinLength(2, { message: 'First name must be at least 2 characters long' })
+  @MinLength(2)
   firstName: string;
 
   @IsString()
-  @MinLength(2, { message: 'Last name must be at least 2 characters long' })
+  @MinLength(2)
   lastName: string;
 
-  @IsEmail({}, { message: 'Email is not valid' })
+  @IsEmail()
   email: string;
 
   @IsString()
-  @MinLength(6, { message: 'Password must be at least 6 characters long' })
+  @MinLength(6)
   password: string;
 
-  @IsNumberString({}, { message: 'Phone must contain only digits' })
+  @IsNumberString()
   phone: string;
 
-  @IsInt({ message: 'Age must be an integer' })
-  @Min(18, { message: 'Age must be at least 18' })
-  @Max(70, { message: 'Age must not be more than 70' })
+  @IsInt()
+  @Min(18)
+  @Max(70)
   age: number;
 
   @IsString()
@@ -52,9 +53,11 @@ export class LoginLibrarianDto {
 }
 
 export class CreateLibrarianProfileDto {
+  @IsOptional()
   @IsString()
-  address: string;
+  address?: string;
 
+  @IsOptional()
   @IsString()
-  bio: string;
+  bio?: string;
 }

@@ -21,19 +21,20 @@ export class Admin {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
+  @Column({ length: 120 })
   fullName: string;
 
-  @Column({ unique: true })
+  @Column({ unique: true, length: 200 })
   email: string;
 
-  @Column()
+  // ✅ security: do not return password in queries
+  @Column({ select: false })
   password: string;
 
-  @Column()
+  @Column({ length: 20 })
   phone: string;
 
-  @Column()
+  @Column('int')
   age: number;
 
   @Column({ default: 'admin' })
@@ -63,5 +64,3 @@ export class Admin {
   @UpdateDateColumn()
   updatedAt: Date;
 }
-export { AdminProfile };
-

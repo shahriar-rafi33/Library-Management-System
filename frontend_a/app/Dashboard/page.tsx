@@ -1,11 +1,11 @@
-import React from "react";
-import Link from "next/link";
 import Title from "@/Content/Title";
-export default function Home() {
+
+export default function Dashboard() {
   return (
     <>
-    <Title title="Dashboard"></Title>
-      <h1>Welcome to the Dashboard</h1>
+      <Title title="Dashboard" />
+      <h1 className="text-2xl font-bold mb-2">Dashboard</h1>
+      <p>Use the navigation menu to manage books, issue books, and return books.</p>
     </>
   );
 }

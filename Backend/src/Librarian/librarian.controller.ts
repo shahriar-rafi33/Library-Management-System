@@ -20,28 +20,23 @@ import {
   LoginLibrarianDto,
   CreateLibrarianProfileDto,
 } from './dto/create-librarian.dto';
-import { JwtAuthGuard } from '../Admin/admin.guard';
-import { query } from 'express';
+import { JwtAuthGuard } from '../Auth/jwt-auth.guard';
 
 @Controller('librarian')
 export class LibrarianController {
   constructor(private readonly librarianService: LibrarianService) {}
 
-  // ---------- Auth routes ----------
-
   @Post('register')
   @UsePipes(new ValidationPipe({ whitelist: true }))
-  register(@Body() createDto: CreateLibrarianDto) {
-    return this.librarianService.register(createDto);
+  register(@Body() dto: CreateLibrarianDto) {
+    return this.librarianService.register(dto);
   }
 
   @Post('login')
   @UsePipes(new ValidationPipe({ whitelist: true }))
-  login(@Body() loginDto: LoginLibrarianDto) {
-    return this.librarianService.login(loginDto);
+  login(@Body() dto: LoginLibrarianDto) {
+    return this.librarianService.login(dto);
   }
-
-  // ---------- Basic CRUD (protected by JWT) ----------
 
   @UseGuards(JwtAuthGuard)
   @Get()
@@ -50,14 +45,9 @@ export class LibrarianController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Get('search/:query')
-  search(@Query('query') query: string) {
-    return this.librarianService.searchByName(query);
-  }
-  
-  @Get('phone/:phone')
-  searchByPhone(@Param('phone') phone: string) {
-    return this.librarianService.searchByPhone(phone);
+  @Get('search')
+  search(@Query('q') q: string) {
+    return this.librarianService.searchByName(q ?? '');
   }
 
   @UseGuards(JwtAuthGuard)
@@ -66,32 +56,27 @@ export class LibrarianController {
     return this.librarianService.getLibrarianByPhone(phone);
   }
 
-  // ------ Fetch by Email (STRING) ------
   @UseGuards(JwtAuthGuard)
   @Get('email/:email')
   findByEmail(@Param('email') email: string) {
     return this.librarianService.findByEmail(email);
   }
 
-  // ------ Fetch by ID (NUMBER) ------
   @UseGuards(JwtAuthGuard)
-  @Get('id/:id')
+  @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.librarianService.findOneById(id);
   }
 
   @UseGuards(JwtAuthGuard)
-  @Put('id/:id')
+  @Put(':id')
   @UsePipes(new ValidationPipe({ whitelist: true }))
-  update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() updateDto: UpdateLibrarianDto,
-  ) {
-    return this.librarianService.update(id, updateDto);
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateLibrarianDto) {
+    return this.librarianService.update(id, dto);
   }
 
   @UseGuards(JwtAuthGuard)
-  @Patch('id/:id/active')
+  @Patch(':id/active')
   changeStatus(
     @Param('id', ParseIntPipe) id: number,
     @Body('isActive') isActive: boolean,
@@ -100,55 +85,24 @@ export class LibrarianController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Delete('id/:id')
+  @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.librarianService.remove(id);
   }
 
   @UseGuards(JwtAuthGuard)
-  @Delete('email/:email')
-  removeByEmail(@Param('email') email: string) {
-    return this.librarianService.removeByEmail(email);
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Delete('phone/:phone')
-  removeByPhone(@Param('phone') phone: string) {
-    return this.librarianService.removeByPhone(phone);
-  }
-
-  // ---------- One-to-One Profile ----------
-
-  @UseGuards(JwtAuthGuard)
-  @Put('id/:id/profile')
+  @Put(':id/profile')
   @UsePipes(new ValidationPipe({ whitelist: true }))
-  upsertProfile(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: CreateLibrarianProfileDto,
-  ) {
+  upsertProfile(@Param('id', ParseIntPipe) id: number, @Body() dto: CreateLibrarianProfileDto) {
     return this.librarianService.upsertProfile(id, dto);
   }
 
-  // ---------- Admin <-> Librarian Mapping ----------
-
   @UseGuards(JwtAuthGuard)
-  @Put('id/:id/supervisor/:adminId')
+  @Put(':id/supervisor/:adminId')
   assignSupervisor(
     @Param('id', ParseIntPipe) id: number,
     @Param('adminId', ParseIntPipe) adminId: number,
   ) {
     return this.librarianService.assignSupervisor(id, adminId);
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Get('id/:id/supervisor')
-  getSupervisor(@Param('id', ParseIntPipe) id: number) {
-    return this.librarianService.getSupervisor(id);
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Get('supervisor/:adminId')
-  getBySupervisor(@Param('adminId', ParseIntPipe) adminId: number) {
-    return this.librarianService.getLibrariansBySupervisor(adminId);
   }
 }

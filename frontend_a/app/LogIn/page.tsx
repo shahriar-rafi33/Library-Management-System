@@ -9,8 +9,8 @@ import Input from "@/Content/Input";
 import Link from "next/link";
 
 const loginSchema = z.object({
-  email: z.string().email("Invalid email"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  email: z.string().email({ message: "Please enter a valid email address" }),
+  password: z.string().min(6, { message: "Password must be at least 6 characters long" }),
 });
 
 export default function LoginPage() {
@@ -40,7 +40,6 @@ export default function LoginPage() {
     e.preventDefault();
     setErrors({});
 
-    // ✅ keep Zod validation
     const result = loginSchema.safeParse(form);
     if (!result.success) {
       const err: any = {};
@@ -50,24 +49,19 @@ export default function LoginPage() {
     }
 
     if (!API) {
-      setErrors({ form: "Missing NEXT_PUBLIC_API_ENDPOINT in .env/.env.local" });
+      setErrors({ form: "Missing NEXT_PUBLIC_API_ENDPOINT in .env.local" });
       return;
     }
 
     setLoading(true);
 
     try {
-      const url =
-        role === "admin" ? `${API}/admin/login` : `${API}/librarian/login`;
-
-      // ✅ Axios POST (PPT style)
+      const url = role === "admin" ? `${API}/admin/login` : `${API}/librarian/login`;
       const response = await axios.post(url, result.data);
 
-      // ✅ extract AXIOS response.data (PPT style)
       const jsonData = response.data;
-      console.log("LOGIN RESPONSE:", jsonData);
-
       const token = jsonData?.accessToken;
+
       if (!token) {
         setErrors({ form: "No accessToken returned from server" });
         return;
@@ -75,6 +69,9 @@ export default function LoginPage() {
 
       localStorage.setItem("accessToken", token);
       localStorage.setItem("role", role);
+
+      // ✅ IMPORTANT: update navbar immediately
+      window.dispatchEvent(new Event("authChanged"));
 
       router.push(role === "admin" ? "/admin" : "/librarian");
     } catch (error) {
@@ -85,12 +82,16 @@ export default function LoginPage() {
   }
 
   return (
-    <div>
+    <div className="max-w-md mx-auto p-6">
       <Title title="Login" />
 
-      <label>Login as</label>
+      <label className="text-white">Login as</label>
       <br />
-      <select value={role} onChange={(e) => setRole(e.target.value as any)}>
+      <select
+        value={role}
+        onChange={(e) => setRole(e.target.value as any)}
+        className="mt-2 mb-4 w-full p-2 rounded text-black"
+      >
         <option value="admin">Admin</option>
         <option value="librarian">Librarian</option>
       </select>
@@ -112,15 +113,18 @@ export default function LoginPage() {
           error={errors.password}
         />
 
-        {/* ✅ backend error message */}
-        {errors.form ? <p style={{ color: "red" }}>{errors.form}</p> : null}
+        {errors.form ? <p className="text-red-400 mt-2">{errors.form}</p> : null}
 
-        <button type="submit" disabled={loading}>
+        <button
+          type="submit"
+          disabled={loading}
+          className="mt-3 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+        >
           {loading ? "Logging in..." : "Login"}
         </button>
 
-        <p>
-          Dont have an account? <Link href="/Registration">Register</Link>
+        <p className="mt-3 text-white">
+          Dont have an account? <Link className="underline" href="/Registration">Register</Link>
         </p>
       </form>
     </div>

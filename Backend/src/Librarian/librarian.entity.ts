@@ -1,8 +1,7 @@
 import {
   Entity,
   Column,
-  PrimaryColumn,
-  BeforeInsert,
+  PrimaryGeneratedColumn,
   OneToOne,
   JoinColumn,
   ManyToOne,
@@ -11,10 +10,9 @@ import {
 } from 'typeorm';
 import { Admin } from '../Admin/admin.entity';
 
-// One-to-one table: extra info about librarian
 @Entity('librarian_profiles')
 export class LibrarianProfile {
-  @PrimaryColumn('int')
+  @PrimaryGeneratedColumn()
   id: number;
 
   @Column({ nullable: true, length: 255 })
@@ -26,7 +24,7 @@ export class LibrarianProfile {
 
 @Entity('librarians')
 export class LibrarianEntity {
-  @PrimaryColumn('int')
+  @PrimaryGeneratedColumn()
   id: number;
 
   @Column({ length: 100 })
@@ -35,13 +33,10 @@ export class LibrarianEntity {
   @Column({ length: 100 })
   lastName: string;
 
-  @Column({ length: 200, nullable: true })
-  fullName?: string;
-
-  @Column({ unique: true })
+  @Column({ unique: true, length: 200 })
   email: string;
 
-  @Column()
+  @Column({ select: false })
   password: string;
 
   @Column({ length: 20 })
@@ -56,13 +51,11 @@ export class LibrarianEntity {
   @Column({ default: true })
   isActive: boolean;
 
-  // One-to-one relation with profile
   @OneToOne(() => LibrarianProfile, { cascade: true, eager: true, nullable: true })
   @JoinColumn()
   profile?: LibrarianProfile;
 
-  // Many librarians supervised by one admin (One-to-Many from Admin side)
-  @ManyToOne(() => Admin, (admin) => (admin as any).librarians, {
+  @ManyToOne(() => Admin, (admin) => admin.librarians, {
     nullable: true,
     onDelete: 'SET NULL',
   })
@@ -73,16 +66,4 @@ export class LibrarianEntity {
 
   @UpdateDateColumn()
   updatedAt: Date;
-
-  @BeforeInsert()
-  generateIdAndFullName() {
-    // custom 6-digit numeric id
-    if (!this.id) {
-      this.id = Math.floor(100000 + Math.random() * 900000);
-    }
-    // full name auto build
-    if (!this.fullName) {
-      this.fullName = `${this.firstName} ${this.lastName}`;
-    }
-  }
 }

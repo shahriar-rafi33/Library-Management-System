@@ -1,10 +1,4 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  OneToOne,
-  JoinColumn,
-} from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn } from 'typeorm';
 import { Admin } from './admin.entity';
 
 @Entity('admin_profiles')
@@ -18,7 +12,7 @@ export class AdminProfile {
   @Column({ nullable: true })
   bio?: string;
 
-  @OneToOne(() => Admin, (admin) => admin.profile)
+  @OneToOne(() => Admin, (admin) => admin.profile, { onDelete: 'CASCADE' })
   @JoinColumn()
   admin: Admin;
 }

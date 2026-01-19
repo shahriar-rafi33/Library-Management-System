@@ -18,10 +18,19 @@ export default function Input({
   type = "text",
 }: Props) {
   return (
-    <div style={{ marginBottom: "10px" }}>
-      <label>{label}</label><br />
-      <input name={name} type={type} value={value} onChange={onChange} />
-      {error && <p style={{ color: "red" }}>{error}</p>}
+    <div className="mb-3">
+      <label className="block mb-1 text-white">{label}</label>
+
+      <input
+        name={name}
+        type={type}
+        value={value}
+        onChange={onChange}
+        className="w-full px-3 py-2 border border-gray-300 rounded bg-white text-black
+                   focus:outline-none focus:ring-2 focus:ring-red-500"
+      />
+
+      {error && <p className="text-red-400 text-sm mt-1">{error}</p>}
     </div>
   );
 }

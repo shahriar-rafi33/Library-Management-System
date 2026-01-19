@@ -1,14 +1,18 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+
 import { AdminModule } from './Admin/admin.module';
 import { LibrarianModule } from './Librarian/librarian.module';
-import { TypeOrmModule } from '@nestjs/typeorm';
+// (Optional – only if you have these modules)
+import { BookModule } from './Book/book.module';
+import { IssueModule } from './Issue/issue.module';
 
 @Module({
   imports: [
-    AdminModule,
-    LibrarianModule,
+    // ✅ Database Configuration
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: 'localhost',
@@ -19,6 +23,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
       autoLoadEntities: true,
       synchronize: true,
     }),
+
+    // ✅ Feature Modules
+    AdminModule,
+    LibrarianModule,
+    BookModule,
+    IssueModule,
   ],
   controllers: [AppController],
   providers: [AppService],

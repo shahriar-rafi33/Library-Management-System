@@ -9,9 +9,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
-import { MailerService } from '@nestjs-modules/mailer';
 
-import { Admin, AdminProfile, AdminStatus } from './admin.entity';
+import { Admin, AdminStatus } from './admin.entity';
 import { LibrarianEntity } from '../Librarian/librarian.entity';
 import {
   CreateAdminDto,
@@ -19,6 +18,7 @@ import {
   LoginAdminDto,
   CreateAdminProfileDto,
 } from './dto/create-admin.dto';
+import { AdminProfile } from './admin.profile.entity';
 
 @Injectable()
 export class AdminService {
@@ -30,160 +30,112 @@ export class AdminService {
     @InjectRepository(LibrarianEntity)
     private readonly librarianRepository: Repository<LibrarianEntity>,
     private readonly jwtService: JwtService,
-    private readonly mailerService: MailerService,
   ) {}
 
+  private sanitize(admin: any) {
+    if (!admin) return admin;
+    const { password, ...safe } = admin;
+    return safe;
+  }
 
-  async register(createDto: CreateAdminDto): Promise<Admin> {
+  async register(dto: CreateAdminDto) {
     const existing = await this.adminRepository.findOne({
-      where: { email: createDto.email },
+      where: { email: dto.email },
     });
+    if (existing) throw new BadRequestException('Email is already registered');
 
-    if (existing) {
-      throw new BadRequestException('Email is already registered');
-    }
-
-    const salt = await bcrypt.genSalt();
-    const hashedPassword = await bcrypt.hash(createDto.password, salt);
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
 
     const admin = this.adminRepository.create({
-      ...createDto,
+      ...dto,
       password: hashedPassword,
-      role: createDto.role ?? 'admin',
-      status: createDto.status ?? AdminStatus.ACTIVE,
+      role: dto.role ?? 'admin',
+      status: dto.status ?? AdminStatus.ACTIVE,
     });
 
     const saved = await this.adminRepository.save(admin);
-
-    try {
-      await this.mailerService.sendMail({
-        to: saved.email,
-        subject: 'Admin Account Created',
-        text: `Hi ${saved.fullName}, your admin account is ready.`,
-      });
-    } catch (error) {
-      console.error('Failed to send welcome email:', error?.message ?? error);
-    }
-
-    return saved;
-    /* return {
-    email: saved.email,
-  };*/
+    return this.sanitize(saved);
   }
 
+  async login(dto: LoginAdminDto) {
+    // password is select:false, so we must explicitly add it
+    const admin = await this.adminRepository
+      .createQueryBuilder('admin')
+      .addSelect('admin.password')
+      .where('admin.email = :email', { email: dto.email })
+      .getOne();
 
-  async login(loginDto: LoginAdminDto): Promise<{ message: string; accessToken: string }> {
-  const admin = await this.adminRepository.findOne({
-    where: { email: loginDto.email },
-  });
+    if (!admin) throw new HttpException('Invalid Email', HttpStatus.UNAUTHORIZED);
 
-  if (!admin) {
-    throw new HttpException('Invalid Email', HttpStatus.UNAUTHORIZED);
+    const ok = await bcrypt.compare(dto.password, admin.password);
+    if (!ok) throw new HttpException('Invalid Password', HttpStatus.UNAUTHORIZED);
+
+    const payload = { sub: admin.id, email: admin.email, role: admin.role };
+    const accessToken = await this.jwtService.signAsync(payload);
+
+    return {
+      message: 'Login successful',
+      accessToken,
+      role: admin.role,
+      id: admin.id,
+      fullName: admin.fullName,
+    };
   }
 
-  const isPasswordValid = await bcrypt.compare(
-    loginDto.password,
-    admin.password,
-  );
-
-  if (!isPasswordValid) {
-    throw new HttpException('Invalid Password', HttpStatus.UNAUTHORIZED);
-  }
-
-  const payload = {
-    sub: admin.id,
-    email: admin.email,
-    role: 'admin',
-  };
-
-  const accessToken = await this.jwtService.signAsync(payload);
-
-  return {
-    message: 'Login successful',
-    accessToken,
-  };
-}
-
-
-  async findAll(status?: AdminStatus): Promise<Admin[]> {
+  async findAll(status?: AdminStatus) {
     const options: any = {
       relations: ['profile', 'librarians'],
       order: { createdAt: 'DESC' },
     };
-
-    if (status) {
-      options.where = { status };
-    }
-
+    if (status) options.where = { status };
     return this.adminRepository.find(options);
   }
 
-  async findOneById(id: number): Promise<Admin> {
+  async findOneById(id: number) {
     const admin = await this.adminRepository.findOne({
       where: { id },
       relations: ['profile', 'librarians'],
     });
-
-    if (!admin) {
-      throw new NotFoundException(`Admin with id ${id} not found`);
-    }
-
+    if (!admin) throw new NotFoundException(`Admin with id ${id} not found`);
     return admin;
   }
 
-  async update(id: number, dto: UpdateAdminDto): Promise<Admin> {
+  async update(id: number, dto: UpdateAdminDto) {
     const admin = await this.findOneById(id);
 
     if (dto.email && dto.email !== admin.email) {
-      const emailExists = await this.adminRepository.findOne({
-        where: { email: dto.email },
-      });
-      if (emailExists) {
-        throw new BadRequestException('Email is already registered');
-      }
+      const exists = await this.adminRepository.findOne({ where: { email: dto.email } });
+      if (exists) throw new BadRequestException('Email is already registered');
     }
 
     if (dto.password) {
-      const salt = await bcrypt.genSalt();
-      dto.password = await bcrypt.hash(dto.password, salt);
+      dto.password = await bcrypt.hash(dto.password, 10);
     }
 
     Object.assign(admin, dto);
-
-    return this.adminRepository.save(admin);
+    const saved = await this.adminRepository.save(admin);
+    return this.sanitize(saved);
   }
 
-  async changeStatus(id: number, status: AdminStatus): Promise<Admin> {
+  async changeStatus(id: number, status: AdminStatus) {
     const admin = await this.findOneById(id);
     admin.status = status;
     return this.adminRepository.save(admin);
   }
 
-  async remove(id: number): Promise<{ message: string }> {
+  async remove(id: number) {
     const admin = await this.findOneById(id);
     await this.adminRepository.remove(admin);
     return { message: `Admin with id ${id} deleted` };
   }
 
-  async searchByName(name: string): Promise<Admin[]> {
-    const like = `%${name}%`;
+  async searchByName(name: string) {
     return this.adminRepository.find({
-      where: { fullName: Like(like) },
+      where: { fullName: Like(`%${name}%`) },
     });
   }
 
-  async getAdminsOlderThan(ageLimit: number): Promise<Admin[]> {
-    return this.adminRepository
-      .createQueryBuilder('admin')
-      .where('admin.age > :age', { age: ageLimit })
-      .orderBy('admin.age', 'DESC')
-      .getMany();
-  }
-
-  async upsertProfile(
-    adminId: number,
-    dto: CreateAdminProfileDto,
-  ): Promise<Admin> {
+  async upsertProfile(adminId: number, dto: CreateAdminProfileDto) {
     const admin = await this.findOneById(adminId);
 
     if (admin.profile) {
@@ -191,10 +143,7 @@ export class AdminService {
       admin.profile.bio = dto.bio ?? admin.profile.bio;
       await this.profileRepository.save(admin.profile);
     } else {
-      const profile = this.profileRepository.create({
-        ...dto,
-        admin,
-      });
+      const profile = this.profileRepository.create({ ...dto, admin });
       await this.profileRepository.save(profile);
       admin.profile = profile;
     }
@@ -202,12 +151,12 @@ export class AdminService {
     return this.adminRepository.save(admin);
   }
 
-  async getProfile(adminId: number): Promise<AdminProfile | null> {
+  async getProfile(adminId: number) {
     const admin = await this.findOneById(adminId);
     return admin.profile ?? null;
   }
 
-  async deleteProfile(adminId: number): Promise<void> {
+  async deleteProfile(adminId: number) {
     const admin = await this.findOneById(adminId);
     if (admin.profile) {
       await this.profileRepository.remove(admin.profile);
@@ -216,34 +165,22 @@ export class AdminService {
     }
   }
 
-
-
-  async getLibrariansForAdmin(
-    adminId: number,
-  ): Promise<LibrarianEntity[]> {
+  async getLibrariansForAdmin(adminId: number) {
     await this.findOneById(adminId);
     return this.librarianRepository.find({
       where: { supervisor: { id: adminId } },
-      relations: ['supervisor'],
+      relations: ['supervisor', 'profile'],
     });
   }
 
-  async assignLibrarian(
-    adminId: number,
-    librarianId: number,
-  ): Promise<LibrarianEntity> {
+  async assignLibrarian(adminId: number, librarianId: number) {
     const admin = await this.findOneById(adminId);
 
     const librarian = await this.librarianRepository.findOne({
       where: { id: librarianId },
-      relations: ['supervisor'],
+      relations: ['supervisor', 'profile'],
     });
-
-    if (!librarian) {
-      throw new NotFoundException(
-        `Librarian with id ${librarianId} not found`,
-      );
-    }
+    if (!librarian) throw new NotFoundException(`Librarian with id ${librarianId} not found`);
 
     librarian.supervisor = admin;
     return this.librarianRepository.save(librarian);

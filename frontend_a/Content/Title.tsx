@@ -1,10 +1,11 @@
-import type { Metadata } from "next";
+"use client";
 
-export default function Title(props: { title: string }) {
-  const metadata: Metadata = {
-    title: props.title,
-    description: "...",
-  };
+import { useEffect } from "react";
 
-  return <title>{props.title}</title>;
+export default function Title({ title }: { title: string }) {
+  useEffect(() => {
+    document.title = title;
+  }, [title]);
+
+  return null;
 }

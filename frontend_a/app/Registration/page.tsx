@@ -4,74 +4,86 @@ import { useState } from "react";
 import { z } from "zod";
 import Title from "@/Content/Title";
 import Input from "@/Content/Input";
-import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import axios from "axios";
+import { api,getAxiosErrorMessage } from "@/lib/api";
 
-const adminSchema = z.object({
-  fullName: z.string().min(2, "Name must be at least 2 characters long"),
-  email: z.string().email("Email is not valid"),
-  password: z.string().min(6, "Password must be at least 6 characters long"),
-  phone: z.string().regex(/^\d+$/, "Phone must contain only digits"),
-  age: z.coerce
+export const adminSchema = z.object({
+  fullName: z
+    .string()
+    .min(2, { message: "Full name must be at least 2 characters long" }),
+
+  email: z
+    .string()
+    .email({ message: "Please enter a valid email address" }),
+
+  password: z
+    .string()
+    .min(6, { message: "Password must be at least 6 characters long" }),
+
+  phone: z
+    .string()
+    .regex(/^\d+$/, { message: "Phone must contain only digits" }),
+
+  age: z
+    .coerce
     .number()
-    .int("Age must be an integer")
-    .min(18, "Age must be at least 18")
-    .max(80, "Age must not exceed 80"),
-  role: z
-    .enum(["admin", "librarian"], { message: "Role must be admin or librarian" })
-    .optional(),
-  status: z
-    .enum(["active", "inactive"], { message: "Status must be active or inactive" })
-    .optional(),
+    .int({ message: "Age must be an integer" })
+    .min(18, { message: "Age must be at least 18" })
+    .max(80, { message: "Age must not exceed 80" }),
 });
 
-const librarianSchema = z.object({
-  firstName: z.string().min(2, "First name must be at least 2 characters long"),
-  lastName: z.string().min(2, "Last name must be at least 2 characters long"),
-  email: z.string().email("Email is not valid"),
-  password: z.string().min(6, "Password must be at least 6 characters long"),
-  phone: z.string().regex(/^\d+$/, "Phone must contain only digits"),
-  age: z.coerce
+export const librarianSchema = z.object({
+  firstName: z
+    .string()
+    .min(2, { message: "First name must be at least 2 characters long" }),
+
+  lastName: z
+    .string()
+    .min(2, { message: "Last name must be at least 2 characters long" }),
+
+  email: z
+    .string()
+    .email({ message: "Please enter a valid email address" }),
+
+  password: z
+    .string()
+    .min(6, { message: "Password must be at least 6 characters long" }),
+
+  phone: z
+    .string()
+    .regex(/^\d+$/, { message: "Phone must contain only digits" }),
+
+  age: z
+    .coerce
     .number()
-    .int("Age must be an integer")
-    .min(18, "Age must be at least 18")
-    .max(70, "Age must not be more than 70"),
-  designation: z.string().min(1, "Designation is required"),
-  isActive: z.coerce.boolean(),
+    .int({ message: "Age must be an integer" })
+    .min(18, { message: "Age must be at least 18" })
+    .max(70, { message: "Age must not exceed 70" }),
+
+  designation: z
+    .string()
+    .min(1, { message: "Designation is required" }),
+
+  isActive: z
+    .coerce
+    .boolean(),
 });
 
-function zodToErrors(error: z.ZodError) {
-  const err: Record<string, string> = {};
-  error.issues.forEach((i) => {
-    const key = String(i.path[0] ?? "form");
-    err[key] = i.message;
-  });
-  return err;
-}
 
 export default function RegisterPage() {
   const router = useRouter();
-
   const [type, setType] = useState<"admin" | "librarian">("admin");
-  const [success, setSuccess] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const API = process.env.NEXT_PUBLIC_API_ENDPOINT;
-
   const [form, setForm] = useState<any>({
-    // admin
     fullName: "",
     email: "",
     password: "",
     phone: "",
     age: "",
-    role: "",     // optional
-    status: "",   // optional
-
-    // librarian
     firstName: "",
     lastName: "",
     designation: "",
@@ -86,74 +98,43 @@ export default function RegisterPage() {
     }));
   }
 
-  function getAxiosErrorMessage(error: unknown) {
-    if (axios.isAxiosError(error)) {
-      const data: any = error.response?.data;
-      const msg = data?.message ?? data?.error ?? error.message;
-      return Array.isArray(msg) ? msg.join(", ") : String(msg);
-    }
-    return "Something went wrong";
+  function zodToErrors(err: z.ZodError) {
+    const map: Record<string, string> = {};
+    err.issues.forEach((i) => (map[String(i.path[0] ?? "form")] = i.message));
+    return map;
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErrors({});
     setSuccess(false);
-
-    if (!API) {
-      setErrors({ form: "Missing NEXT_PUBLIC_API_ENDPOINT in .env/.env.local" });
-      return;
-    }
-
     setLoading(true);
 
     try {
       if (type === "admin") {
-        // ✅ keep same attributes
-        const adminData = {
+        const data = {
           fullName: form.fullName,
           email: form.email,
           password: form.password,
           phone: form.phone,
           age: form.age,
-          role: form.role ? form.role : undefined,
-          status: form.status ? form.status : undefined,
         };
 
-        // ✅ keep zod
-        const result = adminSchema.safeParse(adminData);
-        if (!result.success) {
-          setErrors(zodToErrors(result.error));
+        const parsed = adminSchema.safeParse(data);
+        if (!parsed.success) {
+          setErrors(zodToErrors(parsed.error));
           return;
         }
-          
-        // ✅ important: send result.data (age becomes number) to match DTO
-        const response = await axios.post(`${API}/admin/register`, result.data);
 
-        const jsonData = response.data; // PPT style
-        console.log("ADMIN REGISTER RESPONSE:", jsonData);
+        const response = await api.post("/admin/register", parsed.data);
+        console.log("ADMIN REGISTER:", response.data);
 
         setSuccess(true);
-
-        // keep your reset logic
-        setForm((prev: any) => ({
-          ...prev,
-          fullName: "",
-          email: "",
-          password: "",
-          phone: "",
-          age: "",
-          role: "",
-          status: "",
-        }));
-
-        // ✅ redirect to login after success
         setTimeout(() => router.push("/LogIn"), 700);
         return;
       }
 
-      // librarian
-      const librarianData = {
+      const data = {
         firstName: form.firstName,
         lastName: form.lastName,
         email: form.email,
@@ -164,34 +145,18 @@ export default function RegisterPage() {
         isActive: form.isActive,
       };
 
-      const result = librarianSchema.safeParse(librarianData);
-      if (!result.success) {
-        setErrors(zodToErrors(result.error));
+      const parsed = librarianSchema.safeParse(data);
+      if (!parsed.success) {
+        setErrors(zodToErrors(parsed.error));
         return;
       }
 
-      const response = await axios.post(`${API}/librarian/register`, result.data);
-
-      const jsonData = response.data; // PPT style
-      console.log("LIBRARIAN REGISTER RESPONSE:", jsonData);
+      const response = await api.post("/librarian/register", parsed.data);
+      console.log("LIBRARIAN REGISTER:", response.data);
 
       setSuccess(true);
-
-      setForm((prev: any) => ({
-        ...prev,
-        firstName: "",
-        lastName: "",
-        email: "",
-        password: "",
-        phone: "",
-        age: "",
-        designation: "",
-        isActive: true,
-      }));
-
       setTimeout(() => router.push("/LogIn"), 700);
     } catch (error) {
-      // ✅ show backend insertion errors here
       setErrors({ form: getAxiosErrorMessage(error) });
     } finally {
       setLoading(false);
@@ -199,146 +164,57 @@ export default function RegisterPage() {
   }
 
   return (
-    <div>
+    <div className="max-w-md">
       <Title title="Register" />
+      <h1 className="text-2xl font-bold mb-4">Register</h1>
 
-      <div style={{ marginBottom: "12px" }}>
-        <label>Register as</label>
-        <br />
-        <select
-          value={type}
-          onChange={(e) => {
-            setType(e.target.value as any);
-            setErrors({});
-            setSuccess(false);
-          }}
-        >
-          <option value="admin">Admin</option>
-          <option value="librarian">Librarian</option>
-        </select>
-      </div>
+      <label className="block mb-2 font-medium">Register as</label>
+      <select
+        className="border rounded px-3 py-2 mb-4 w-full"
+        value={type}
+        onChange={(e) => {
+          setType(e.target.value as any);
+          setErrors({});
+          setSuccess(false);
+        }}
+      >
+        <option value="admin">Admin</option>
+        <option value="librarian">Librarian</option>
+      </select>
 
       <form onSubmit={handleSubmit} noValidate>
         {type === "admin" ? (
           <>
-            <Input
-              label="Full Name"
-              name="fullName"
-              value={form.fullName}
-              onChange={handleChange}
-              error={errors.fullName}
-            />
-
-            <Input
-              label="Email"
-              name="email"
-              value={form.email}
-              onChange={handleChange}
-              error={errors.email}
-            />
-
-            <Input
-              label="Password"
-              name="password"
-              type="password"
-              value={form.password}
-              onChange={handleChange}
-              error={errors.password}
-            />
-
-            <Input
-              label="Phone"
-              name="phone"
-              value={form.phone}
-              onChange={handleChange}
-              error={errors.phone}
-            />
-
-            <Input
-              label="Age"
-              name="age"
-              value={String(form.age)}
-              onChange={handleChange}
-              error={errors.age}
-            />
+            <Input label="Full Name" name="fullName" value={form.fullName} onChange={handleChange} error={errors.fullName} />
+            <Input label="Email" name="email" value={form.email} onChange={handleChange} error={errors.email} />
+            <Input label="Password" name="password" type="password" value={form.password} onChange={handleChange} error={errors.password} />
+            <Input label="Phone" name="phone" value={form.phone} onChange={handleChange} error={errors.phone} />
+            <Input label="Age" name="age" value={String(form.age)} onChange={handleChange} error={errors.age} />
           </>
         ) : (
           <>
-            <Input
-              label="First Name"
-              name="firstName"
-              value={form.firstName}
-              onChange={handleChange}
-              error={errors.firstName}
-            />
-
-            <Input
-              label="Last Name"
-              name="lastName"
-              value={form.lastName}
-              onChange={handleChange}
-              error={errors.lastName}
-            />
-
-            <Input
-              label="Email"
-              name="email"
-              value={form.email}
-              onChange={handleChange}
-              error={errors.email}
-            />
-
-            <Input
-              label="Password"
-              name="password"
-              type="password"
-              value={form.password}
-              onChange={handleChange}
-              error={errors.password}
-            />
-
-            <Input
-              label="Phone"
-              name="phone"
-              value={form.phone}
-              onChange={handleChange}
-              error={errors.phone}
-            />
-
-            <Input
-              label="Age"
-              name="age"
-              value={String(form.age)}
-              onChange={handleChange}
-              error={errors.age}
-            />
-
-            <Input
-              label="Designation"
-              name="designation"
-              value={form.designation}
-              onChange={handleChange}
-              error={errors.designation}
-            />
+            <Input label="First Name" name="firstName" value={form.firstName} onChange={handleChange} error={errors.firstName} />
+            <Input label="Last Name" name="lastName" value={form.lastName} onChange={handleChange} error={errors.lastName} />
+            <Input label="Email" name="email" value={form.email} onChange={handleChange} error={errors.email} />
+            <Input label="Password" name="password" type="password" value={form.password} onChange={handleChange} error={errors.password} />
+            <Input label="Phone" name="phone" value={form.phone} onChange={handleChange} error={errors.phone} />
+            <Input label="Age" name="age" value={String(form.age)} onChange={handleChange} error={errors.age} />
+            <Input label="Designation" name="designation" value={form.designation} onChange={handleChange} error={errors.designation} />
           </>
         )}
 
-        {/* ✅ backend error message */}
-        {errors.form ? <p style={{ color: "red" }}>{errors.form}</p> : null}
+        {errors.form && <p className="text-red-600 text-sm mb-3">{errors.form}</p>}
 
-        <button type="submit" disabled={loading}>
+        <button className="px-4 py-2 bg-red-700 text-white rounded" type="submit" disabled={loading}>
           {loading ? "Registering..." : "Register"}
         </button>
-        <p>
-          Already have an account? <Link href="/LogIn">Login</Link>
-        </p>
-      </form>
 
-      {success ? (
-        <p style={{ color: "green", marginTop: "10px" }}>
-          Registration successful!
+        <p className="mt-3 text-sm">
+          Already have an account? <Link className="underline" href="/LogIn">Login</Link>
         </p>
-      ) : null}
+
+        {success && <p className="text-green-600 text-sm mt-3">Registration successful!</p>}
+      </form>
     </div>
   );
 }

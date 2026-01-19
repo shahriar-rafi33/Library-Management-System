@@ -14,34 +14,30 @@ import { AdminStatus } from '../admin.entity';
 
 export class CreateAdminDto {
   @IsString()
-  @MinLength(2, { message: 'Name must be at least 2 characters long' })
+  @MinLength(2)
   fullName: string;
 
-  @IsEmail({}, { message: 'Email is not valid' })
+  @IsEmail()
   email: string;
 
   @IsString()
-  @MinLength(6, { message: 'Password must be at least 6 characters long' })
+  @MinLength(6)
   password: string;
 
-  @IsNumberString({}, { message: 'Phone must contain only digits' })
+  @IsNumberString()
   phone: string;
 
-  @IsInt({ message: 'Age must be an integer' })
-  @Min(18, { message: 'Age must be at least 18' })
-  @Max(80, { message: 'Age must not exceed 80' })
+  @IsInt()
+  @Min(18)
+  @Max(80)
   age: number;
 
   @IsOptional()
-  @IsIn(['admin', 'librarian'], {
-    message: 'Role must be admin or librarian',
-  })
+  @IsIn(['admin', 'librarian'])
   role?: string;
 
   @IsOptional()
-  @IsIn(['active', 'inactive'], {
-    message: 'Status must be active or inactive',
-  })
+  @IsIn(['active', 'inactive'])
   status?: AdminStatus;
 }
 
